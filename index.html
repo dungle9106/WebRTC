@@ -386,6 +386,20 @@
       if (logs) logs.innerHTML = '';
     }
 
+    // --- XIN QUYỀN MICRO ĐỂ CHROME LỘ IP LAN THẬT (thay vì tên .local mDNS) ---
+    let mediaPermissionGranted = false;
+    async function requestLocalIpPermission() {
+      if (mediaPermissionGranted) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop()); // tắt micro ngay, không ghi âm
+        mediaPermissionGranted = true;
+        log('[Permission] Đã cấp quyền micro → Chrome sẽ dùng IP LAN thật.', 'success');
+      } catch (err) {
+        log(`[Permission] Không được cấp quyền micro (${err.name}). Vẫn tiếp tục nhưng có thể chỉ thấy địa chỉ .local`);
+      }
+    }
+
     // --- WEBRTC SETUP ---
     function initPeerConnection() {
       const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
@@ -447,6 +461,7 @@
     }
 
     async function createOffer() {
+      await requestLocalIpPermission();
       initPeerConnection();
       isInitiator = true;
 
@@ -469,7 +484,10 @@
 
       try {
         const signal = JSON.parse(remoteText);
-        if (!pc) initPeerConnection();
+        if (!pc) {
+          await requestLocalIpPermission();
+          initPeerConnection();
+        }
 
         await pc.setRemoteDescription(new RTCSessionDescription(signal));
         log(`[Handshake] Đã nhận ${signal.type.toUpperCase()} từ đối phương.`);
